@@ -1,0 +1,267 @@
+﻿@page "/Patients/Monitor"
+@model PatientDashboard.Pages.Patients.MonitorModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Monitor";
+    var vitalsJson = JsonSerializer.Serialize(
+        Model.Vitals,
+        new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }
+    );
+}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h1 class="h4 mb-1">Monitoring: @Model.Patient?.Name</h1>
+        <div class="text-muted">
+            Room @Model.Patient?.RoomNumber • Age @Model.Patient?.Age
+        </div>
+    </div>
+    <div>
+        <a asp-page="/Index" class="btn btn-outline-secondary btn-sm">← Back</a>
+        <button id="simulateBtn" class="btn btn-primary btn-sm">Start 30s Simulation</button>
+    </div>
+    
+</div>
+
+@if (Model.Vitals.Count == 0)
+{
+    <div class="alert alert-info">
+        No vitals yet. Try posting to <code>/api/patients/@Model.Id/vitals</code> to simulate data.
+    </div>
+}
+else
+{
+    <div class="row g-4">
+
+        <div class="card shadow-sm mt-4">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Live Values</h5>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="white-space:nowrap;">Time</th>
+                                <th class="text-end">HR (bpm)</th>
+                                <th class="text-end">SpO₂ (%)</th>
+                                <th class="text-end">Sys (mmHg)</th>
+                                <th class="text-end">Dia (mmHg)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vitalsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Heart Rate (bpm)</h5>
+                    <canvas id="hrChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Oxygen Saturation (%)</h5>
+                    <canvas id="oxChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Blood Pressure (mmHg)</h5>
+                    <canvas id="bpChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.14/signalr.min.js"></script>
+
+    <script>
+        (function () {
+            const vitals = @Html.Raw(vitalsJson);
+            if (!Array.isArray(vitals)) return;
+
+            vitals.sort((a, b) => new Date(a.measuredAt) - new Date(b.measuredAt));
+
+            const timeLabels = vitals.map(v =>
+                new Date(v.measuredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            );
+
+            //table config only keep 10 latest in this project
+            const tbody = document.getElementById('vitalsBody');
+            const MAX_ROWS = 10;   
+
+            function fmtTime(d) {
+                return new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            }
+
+            function addRow(v) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                <td>${fmtTime(v.measuredAt)}</td>
+                <td class="text-end">${v.heartRate}</td>
+                <td class="text-end">${v.oxygenSaturation}</td>
+                <td class="text-end">${v.systolic}</td>
+                <td class="text-end">${v.diastolic}</td>
+                `;
+
+                tbody.prepend(tr);
+
+                while (tbody.rows.length > MAX_ROWS) {
+                tbody.deleteRow(tbody.rows.length - 1);
+                }
+            }
+
+            // Seed the table with the last 10 vitals  sorted by newest first
+            [...vitals].slice(-MAX_ROWS).reverse().forEach(addRow);
+
+            // Prepare Y series
+            const hr = vitals.map(v => v.heartRate);
+            const ox = vitals.map(v => v.oxygenSaturation);
+            const sys = vitals.map(v => v.systolic);
+            const dia = vitals.map(v => v.diastolic);
+
+            // Convert to [{x:i,y:value}] for a linear x-axis
+            const toXY = arr => arr.map((y, i) => ({ x: i, y }));
+
+            const hrData = toXY(hr);
+            const oxData = toXY(ox);
+            const sysData = toXY(sys);
+            const diaData = toXY(dia);
+
+            let idx = hrData.length;
+
+            const WIN = 120; 
+
+            function baseOptions(extra = {}) {
+                return {
+                    responsive: true,
+                    animation: {
+                        duration: 300, 
+                        easing: 'linear' 
+                    },
+                    plugins: {
+                        legend: { display: true },
+                        tooltip: {
+                            callbacks: {
+                                title: items => {
+                                    const x = Math.round(items[0].parsed.x ?? 0);
+                                    return timeLabels[x] ?? '';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { type: 'linear', offset: false, ticks: { maxRotation: 0 } },
+                        ...extra.scales
+                    }
+                };
+            }
+
+            function pinRight(chart) {
+                chart.options.scales.x.min = Math.max(0, idx - WIN);
+                chart.options.scales.x.max = Math.max(1, idx - 1);
+            }
+
+            function pushY(chart, yValues) {
+                // yValues: array of Y values for each dataset in this chart
+                yValues.forEach((y, i) => chart.data.datasets[i].data.push({ x: idx, y }));
+                chart.data.datasets.forEach(ds => {
+                    if (ds.data.length > 5000) ds.data.splice(0, ds.data.length - 5000);
+                });
+                pinRight(chart);
+                chart.update('active');
+            }
+
+            // Create charts (NO labels array; linear x instead)
+            const hrChart = new Chart(document.getElementById('hrChart'), {
+                type: 'line',
+                data: { datasets: [{ label: 'bpm', data: hrData, fill: false, tension: 0.2 }] },
+                options: baseOptions()
+            });
+
+            const oxChart = new Chart(document.getElementById('oxChart'), {
+                type: 'line',
+                data: { datasets: [{ label: '%', data: oxData, fill: false, tension: 0.2 }] },
+                options: baseOptions({ scales: { y: { suggestedMin: 80, suggestedMax: 100 } } })
+            });
+
+            const bpChart = new Chart(document.getElementById('bpChart'), {
+                type: 'line',
+                data: {
+                    datasets: [
+                        { label: 'Systolic', data: sysData, fill: false, tension: 0.2 },
+                        { label: 'Diastolic', data: diaData, fill: false, tension: 0.2 }
+                    ]
+                },
+                options: baseOptions()
+            });
+
+            // Initialize viewport pinned to the right
+            pinRight(hrChart); hrChart.update('none');
+            pinRight(oxChart); oxChart.update('none');
+            pinRight(bpChart); bpChart.update('none');
+
+            const patientId = @Model.Id;
+            const connection = new signalR.HubConnectionBuilder()
+                .withUrl('/hubs/vitals')
+                .withAutomaticReconnect()
+                .build();
+
+            connection.on('ReceiveVital', v => {
+                timeLabels.push(new Date(v.measuredAt).toLocaleTimeString([], {
+                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                }));
+
+                idx++;
+
+                pushY(hrChart, [v.heartRate]);
+                pushY(oxChart, [v.oxygenSaturation]);
+                pushY(bpChart, [v.systolic, v.diastolic]);
+
+                  addRow(v);
+            });
+
+            connection.start()
+                .then(() => connection.invoke('JoinPatient', patientId))
+                .catch(err => console.error('SignalR connect error', err));
+
+            window.addEventListener('beforeunload', () => {
+                connection.invoke('LeavePatient', patientId).finally(() => connection.stop());
+            });
+        })();
+    </script>
+
+    <script>
+        (function () {
+          const btn = document.getElementById('simulateBtn');
+          const patientId = @Model.Id;
+
+          btn.addEventListener('click', async () => {
+            btn.disabled = true;
+            btn.textContent = 'Running…';
+            try {
+              await fetch(`/api/patients/${patientId}/vitals`, { method: 'POST' });
+            } catch (e) {
+              console.error(e);
+              alert('Failed to start simulation');
+            } finally {
+              setTimeout(() => {
+                btn.disabled = false;
+                btn.textContent = 'Start 30s Simulation';
+              }, 35000);
+            }
+          });
+        })();
+    </script>
+}
+
