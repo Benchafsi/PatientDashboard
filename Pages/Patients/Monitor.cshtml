@@ -41,6 +41,7 @@ else
                         <thead class="table-light">
                             <tr>
                                 <th style="white-space:nowrap;">Time</th>
+                                <th>Status</th>
                                 <th class="text-end">HR (bpm)</th>
                                 <th class="text-end">SpO₂ (%)</th>
                                 <th class="text-end">Sys (mmHg)</th>
@@ -98,7 +99,21 @@ else
 
             //table config only keep 10 latest in this project
             const tbody = document.getElementById('vitalsBody');
-            const MAX_ROWS = 10;   
+            const MAX_ROWS = 10;
+
+            function statusInfo(s) {
+                switch (s) {
+                    case 1: return { text: 'Normal',  badge: 'bg-success', row: '' };
+                    case 2: return { text: 'Warning', badge: 'bg-warning', row: 'table-warning' };
+                    case 3: return { text: 'Critical',badge: 'bg-danger',  row: 'table-danger' };
+                    default:return { text: 'N/A',     badge: 'bg-secondary', row: '' };
+                }
+            }
+
+            function statusBadge(s) {
+                const i = statusInfo(s);
+                return `<span class="badge ${i.badge}">${i.text}</span>`;
+            }
 
             function fmtTime(d) {
                 return new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -106,19 +121,20 @@ else
 
             function addRow(v) {
                 const tr = document.createElement('tr');
+                const sInfo = statusInfo(v.status);
+                if (sInfo.row) tr.classList.add(sInfo.row);
+
                 tr.innerHTML = `
-                <td>${fmtTime(v.measuredAt)}</td>
-                <td class="text-end">${v.heartRate}</td>
-                <td class="text-end">${v.oxygenSaturation}</td>
-                <td class="text-end">${v.systolic}</td>
-                <td class="text-end">${v.diastolic}</td>
+                    <td>${fmtTime(v.measuredAt)}</td>
+                    <td>${statusBadge(v.status)}</td>
+                    <td class="text-end">${v.heartRate}</td>
+                    <td class="text-end">${v.oxygenSaturation}</td>
+                    <td class="text-end">${v.systolic}</td>
+                    <td class="text-end">${v.diastolic}</td>
                 `;
 
                 tbody.prepend(tr);
-
-                while (tbody.rows.length > MAX_ROWS) {
-                tbody.deleteRow(tbody.rows.length - 1);
-                }
+                while (tbody.rows.length > MAX_ROWS) tbody.deleteRow(tbody.rows.length - 1);
             }
 
             // Seed the table with the last 10 vitals  sorted by newest first

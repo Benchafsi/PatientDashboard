@@ -1,3 +1,11 @@
-﻿namespace PatientDashboard.Models.Dtos;
+﻿using PatientDashboard.Models.Enums;
 
-public record VitalDto(int HeartRate, int Systolic, int Diastolic, int OxygenSaturation, DateTime? MeasuredAt);
+namespace PatientDashboard.Models.Dtos;
+
+public record VitalDto(
+    int HeartRate,
+    int Systolic,
+    int Diastolic,
+    int OxygenSaturation,
+    DateTime? MeasuredAt,
+    VitalStatus Status);

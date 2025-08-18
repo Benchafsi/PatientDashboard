@@ -48,7 +48,14 @@ namespace PatientDashboard.Pages.Patients
 
                 Vitals = vitals
                     .OrderBy(v => v.MeasuredAt)
-                    .Select(v => new VitalDto(v.HeartRate, v.Systolic, v.Diastolic, v.OxygenSaturation, v.MeasuredAt))
+                    .Select(
+                        v => new VitalDto(
+                            v.HeartRate,
+                            v.Systolic,
+                            v.Diastolic,
+                            v.OxygenSaturation,
+                            v.MeasuredAt,
+                            v.Status))
                     .ToList();
             } catch(Exception ex)
             {

@@ -39,7 +39,8 @@ public class VitalBroadcastInterceptor : SaveChangesInterceptor
         {
             await _hub.Clients
                 .Group(v.PatientId.ToString())
-                .ReceiveVital(new VitalDto(v.HeartRate, v.Systolic, v.Diastolic, v.OxygenSaturation, v.MeasuredAt));
+                .ReceiveVital(
+                    new VitalDto(v.HeartRate, v.Systolic, v.Diastolic, v.OxygenSaturation, v.MeasuredAt, v.Status));
         }
 
         return await base.SavedChangesAsync(eventData, result, cancellationToken);
