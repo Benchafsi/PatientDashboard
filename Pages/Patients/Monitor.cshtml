@@ -80,7 +80,7 @@ else
         </div>
     </div>
 }
-
+<div id="toastContainer" class="toast-container position-fixed top-0 end-0 p-3" style="z-index:1080;"></div>
 
 @section Scripts {
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -227,6 +227,52 @@ else
             pinRight(oxChart); oxChart.update('none');
             pinRight(bpChart); bpChart.update('none');
 
+            // notifications area
+            function makeToast(title, body, variant = 'danger') {
+                // variant: 'primary' | 'success' | 'warning' | 'danger' | 'info' | 'secondary'...
+                const container = document.getElementById('toastContainer');
+                const wrapper = document.createElement('div');
+                wrapper.className = 'toast align-items-center border-0';
+                wrapper.setAttribute('role', 'alert');
+                wrapper.setAttribute('aria-live', 'assertive');
+                wrapper.setAttribute('aria-atomic', 'true');
+
+                wrapper.innerHTML = `
+                  <div class="toast-header bg-${variant} text-white">
+                    <strong class="me-auto">${title}</strong>
+                    <small>${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'})}</small>
+                    <button type="button" class="btn-close btn-close-white ms-2 mb-1" data-bs-dismiss="toast" aria-label="Close"></button>
+                  </div>
+                  <div class="toast-body">${body}</div>
+                `;
+
+                container.appendChild(wrapper);
+                const toast = new bootstrap.Toast(wrapper, { autohide: true, delay: 5000 });
+                toast.show();
+                wrapper.addEventListener('hidden.bs.toast', () => wrapper.remove());
+            }
+
+            // Compute the reasons for critical status used in client-side hint text
+            function criticalReasons(v) {
+                const reasons = [];
+                if (v.heartRate > 120) reasons.push('HR>120');
+                if (v.oxygenSaturation < 90) reasons.push('SpO₂<90');
+                if (v.systolic > 139 || v.diastolic > 90) reasons.push('BP high');
+                return reasons;
+            }
+
+            // Basic throttle to avoid toast spam if too many arrive within a moment
+            let lastCriticalAt = 0;
+            function showCriticalToast(v) {
+                const now = Date.now();
+                if (now - lastCriticalAt < 1500) return; 
+                lastCriticalAt = now;
+
+                const reasons = criticalReasons(v);
+                const msg = `HR ${v.heartRate} bpm • SpO₂ ${v.oxygenSaturation}% • BP ${v.systolic}/${v.diastolic} mmHg`
+                          + (reasons.length ? ` — ${reasons.join(', ')}` : '');
+                makeToast('Critical vitals detected', msg, 'danger');
+            }
             const patientId = @Model.Id;
             const connection = new signalR.HubConnectionBuilder()
                 .withUrl('/hubs/vitals')
@@ -244,7 +290,10 @@ else
                 pushY(oxChart, [v.oxygenSaturation]);
                 pushY(bpChart, [v.systolic, v.diastolic]);
 
-                  addRow(v);
+                addRow(v);
+                if (v.status === 3) {
+                    showCriticalToast(v);
+                }
             });
 
             connection.start()
@@ -274,7 +323,7 @@ else
               setTimeout(() => {
                 btn.disabled = false;
                 btn.textContent = 'Start 30s Simulation';
-              }, 35000);
+              }, 33000);// with a 3 second padding time
             }
           });
         })();
