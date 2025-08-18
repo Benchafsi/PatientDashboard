@@ -32,6 +32,10 @@ else
                             <a class="btn btn-sm btn-primary" asp-page="./Monitor" asp-route-id="@p.Id">
                                 Monitor
                             </a>
+                            <a class="btn btn-sm btn-outline-secondary ms-1"
+                               asp-page-handler="Export" asp-route-id="@p.Id">
+                                Export Vital Signs to CSV
+                            </a>
                         </td>
                     </tr>
                 }
