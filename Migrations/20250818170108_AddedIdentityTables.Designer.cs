@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PatientDashboard.Data;
 
@@ -10,9 +11,11 @@ using PatientDashboard.Data;
 namespace PatientDashboard.Migrations
 {
     [DbContext(typeof(PatientDashboardDbContext))]
-    partial class PatientDashboardDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250818170108_AddedIdentityTables")]
+    partial class AddedIdentityTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.19");

@@ -1,10 +1,12 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using PatientDashboard.Models;
 
 namespace PatientDashboard.Data;
 
-public class PatientDashboardDbContext : DbContext
+public class PatientDashboardDbContext : IdentityDbContext<IdentityUser>
 {
     public PatientDashboardDbContext(DbContextOptions<PatientDashboardDbContext> options) : base(options)
     {
@@ -16,6 +18,9 @@ public class PatientDashboardDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        //calling base method to make sure Identity tables are created
+        base.OnModelCreating(modelBuilder);
+
         // Soft-delete global filter
         modelBuilder.Entity<Patient>().HasQueryFilter(p => !p.IsDeleted);
         modelBuilder.Entity<VitalSign>().HasQueryFilter(v => !v.IsDeleted);
@@ -27,8 +32,6 @@ public class PatientDashboardDbContext : DbContext
             .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<VitalSign>().HasIndex(v => new { v.PatientId, v.MeasuredAt });
-
-        base.OnModelCreating(modelBuilder);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PatientDashboard.Data;
 using PatientDashboard.RealTime;
@@ -12,8 +13,16 @@ namespace PatientDashboard
         {
             var builder = WebApplication.CreateBuilder(args);
             builder.Services.AddControllers();
-            builder.Services.AddRazorPages();
-
+            builder.Services
+                .AddRazorPages(
+                    options =>
+                    {
+                        // Lock everything by default
+                        options.Conventions.AuthorizeFolder("/");
+                        // We allow anonymous to home and Identity UI but no to patients and monitor
+                        options.Conventions.AllowAnonymousToPage("/Index");
+                        options.Conventions.AllowAnonymousToFolder("/Identity");
+                    });
             builder.Services.AddSingleton<VitalBroadcastInterceptor>();
 
             builder.Services
@@ -24,6 +33,16 @@ namespace PatientDashboard
                             .AddInterceptors(sp.GetRequiredService<VitalBroadcastInterceptor>());
                     },
                     ServiceLifetime.Scoped);
+            builder.Services
+                .AddDefaultIdentity<IdentityUser>(
+                    options =>
+                    {
+                        options.SignIn.RequireConfirmedAccount = true; // dev-friendly
+                        // options.Password.RequiredLength = 6; etc.
+                    })
+                .AddRoles<IdentityRole>()
+                .AddEntityFrameworkStores<PatientDashboardDbContext>();
+
             builder.Services.AddScoped<IPatientService, PatientService>();
             builder.Services.AddScoped<IVitalSignService, VitalSignService>();
             builder.Services.AddSingleton<IVitalSimulationService, VitalSimulationService>();
@@ -36,10 +55,10 @@ namespace PatientDashboard
 
                 try
                 {
-                    logger.LogInformation("Applying EF Core migrations…");
+                    logger.LogInformation("Applying EF Core migrationsï¿½");
                     db.Database.Migrate();
-
-                    logger.LogInformation("Starting database seeding…");
+                    DbSeeder. SeedAdminIdentity(scope.ServiceProvider, logger);
+                    logger.LogInformation("Starting database seedingï¿½");
                     DbSeeder.Seed(db);
                     logger.LogInformation("Database seeding completed.");
                 } catch(Exception ex)
@@ -60,6 +79,7 @@ namespace PatientDashboard
             app.UseHttpsRedirection();
             app.UseStaticFiles();
             app.UseRouting();
+            app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();
             app.MapRazorPages();

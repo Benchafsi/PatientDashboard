@@ -1,4 +1,5 @@
-﻿using PatientDashboard.Models;
+﻿using Microsoft.AspNetCore.Identity;
+using PatientDashboard.Models;
 
 namespace PatientDashboard.Data;
 
@@ -53,6 +54,31 @@ public static class DbSeeder
 
             context.VitalSigns.AddRange(vitals);
             context.SaveChanges();
+        }
+    }
+
+    public static void SeedAdminIdentity(IServiceProvider services, ILogger logger)
+    {
+        var userManager = services.GetRequiredService<UserManager<IdentityUser>>();
+        var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+
+        const string role = "Admin";
+        const string email = "admin@test.com";
+        const string pwd = "Pass12345!@#$%";
+
+        if(!roleManager.RoleExistsAsync(role).GetAwaiter().GetResult())
+        {
+            roleManager.CreateAsync(new IdentityRole(role)).GetAwaiter().GetResult();
+            logger.LogInformation("Created role {Role}", role);
+        }
+
+        var user = userManager.FindByEmailAsync(email).GetAwaiter().GetResult();
+        if(user is null)
+        {
+            user = new IdentityUser { UserName = email, Email = email, EmailConfirmed = true };
+            userManager.CreateAsync(user, pwd).GetAwaiter().GetResult();
+            userManager.AddToRoleAsync(user, role).GetAwaiter().GetResult();
+            logger.LogInformation("Seeded default admin {Email}", email);
         }
     }
 }
