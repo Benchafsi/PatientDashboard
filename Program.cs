@@ -19,8 +19,7 @@ namespace PatientDashboard
                     {
                         // Lock everything by default
                         options.Conventions.AuthorizeFolder("/");
-                        // We allow anonymous to home and Identity UI but no to patients and monitor
-                        options.Conventions.AllowAnonymousToPage("/Index");
+                        // We allow anonymous to Identity UI in order to register and login
                         options.Conventions.AllowAnonymousToFolder("/Identity");
                     });
             builder.Services.AddSingleton<VitalBroadcastInterceptor>();
@@ -37,8 +36,7 @@ namespace PatientDashboard
                 .AddDefaultIdentity<IdentityUser>(
                     options =>
                     {
-                        options.SignIn.RequireConfirmedAccount = true; // dev-friendly
-                        // options.Password.RequiredLength = 6; etc.
+                        options.SignIn.RequireConfirmedAccount = true;
                     })
                 .AddRoles<IdentityRole>()
                 .AddEntityFrameworkStores<PatientDashboardDbContext>();

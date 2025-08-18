@@ -1,10 +1,184 @@
 ﻿@page
 @model IndexModel
+@using System.Text.Json
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "Home";
+    var vitalsJson = JsonSerializer.Serialize(
+        Model.Vitals24h,
+        new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }
+    );
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h1 class="h4 mb-1">24h Overview</h1>
+        <div class="text-muted">Simple trends & history for the last 24 hours</div>
+    </div>
+
+    <form method="get" class="d-flex align-items-center gap-2">
+        <select name="PatientId" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">All Patients</option>
+            @foreach (var p in Model.Patients)
+            {
+                <option value="@p.Id" selected="@(Model.PatientId == p.Id)">
+                    @p.Name (@p.RoomNumber)
+                </option>
+            }
+        </select>
+    </form>
 </div>
+
+@if (Model.Vitals24h.Count == 0)
+{
+    <div class="alert alert-info">
+        No vital signs recorded in the last 24 hours for this selection.
+    </div>
+}
+else
+{
+    <div class="row g-4">
+        <div class="col-12">
+            <div class="d-flex gap-2">
+                <span class="badge bg-success">Normal: @Model.CountNormal</span>
+                <span class="badge bg-warning text-dark">Warning: @Model.CountWarning</span>
+                <span class="badge bg-danger">Critical: @Model.CountCritical</span>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Heart Rate (bpm)</h5>
+                    <canvas id="hrChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Oxygen Saturation (%)</h5>
+                    <canvas id="oxChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Blood Pressure (mmHg)</h5>
+                    <canvas id="bpChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Last 24h (latest 20)</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="white-space:nowrap;">Time</th>
+                                    <th>Status</th>
+                                    <th class="text-end">HR (bpm)</th>
+                                    <th class="text-end">SpO₂ (%)</th>
+                                    <th class="text-end">Sys (mmHg)</th>
+                                    <th class="text-end">Dia (mmHg)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="histBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        (function(){
+            const vitals = @Html.Raw(vitalsJson);
+            if (!Array.isArray(vitals) || vitals.length === 0) return;
+
+            vitals.sort((a,b) => new Date(a.measuredAt) - new Date(b.measuredAt));
+
+            const labels = vitals.map(v => new Date(v.measuredAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}));
+            const hr  = vitals.map(v => v.heartRate);
+            const ox  = vitals.map(v => v.oxygenSaturation);
+            const sys = vitals.map(v => v.systolic);
+            const dia = vitals.map(v => v.diastolic);
+
+            const baseOpts = (extra={}) => ({
+                responsive: true,
+                animation: { duration: 300, easing: 'linear' },
+                plugins: { legend: { display: true } },
+                scales: {
+                    x: { ticks: { maxRotation: 0 } },
+                    ...extra.scales
+                }
+            });
+
+            new Chart(document.getElementById('hrChart'), {
+                type: 'line',
+                data: { labels, datasets: [{ label: 'bpm', data: hr, fill:false, tension:0.2 }] },
+                options: baseOpts()
+            });
+
+            new Chart(document.getElementById('oxChart'), {
+                type: 'line',
+                data: { labels, datasets: [{ label: '%', data: ox, fill:false, tension:0.2 }] },
+                options: baseOpts({ scales: { y: { suggestedMin: 80, suggestedMax: 100 } } })
+            });
+
+            new Chart(document.getElementById('bpChart'), {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'Systolic', data: sys, fill:false, tension:0.2 },
+                        { label: 'Diastolic', data: dia, fill:false, tension:0.2 }
+                    ]
+                },
+                options: baseOpts()
+            });
+
+            const tbody = document.getElementById('histBody');
+            const last20 = [...vitals].slice(-20).reverse();
+
+            function statusInfo(s) {
+                switch (s) {
+                    case 1: return { text: 'Normal',  badge: 'bg-success', row: '' };
+                    case 2: return { text: 'Warning', badge: 'bg-warning', row: 'table-warning' };
+                    case 3: return { text: 'Critical',badge: 'bg-danger',  row: 'table-danger' };
+                    default:return { text: 'N/A',     badge: 'bg-secondary', row: '' };
+                }
+            }
+            function badge(s) {
+                const i = statusInfo(s);
+                return `<span class="badge ${i.badge}">${i.text}</span>`;
+            }
+            function fmtTime(d) {
+                return new Date(d).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+            }
+
+            last20.forEach(v => {
+                const tr = document.createElement('tr');
+                const s = statusInfo(v.status);
+                if (s.row) tr.classList.add(s.row);
+                tr.innerHTML = `
+                    <td>${fmtTime(v.measuredAt)}</td>
+                    <td>${badge(v.status)}</td>
+                    <td class="text-end">${v.heartRate}</td>
+                    <td class="text-end">${v.oxygenSaturation}</td>
+                    <td class="text-end">${v.systolic}</td>
+                    <td class="text-end">${v.diastolic}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        })();
+    </script>
+}
