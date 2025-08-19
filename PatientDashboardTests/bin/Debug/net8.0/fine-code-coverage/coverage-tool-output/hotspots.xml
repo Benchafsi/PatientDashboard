@@ -1,0 +1,63 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Hotspots>
+  <Hotspot>
+    <Assembly>PatientDashboard</Assembly>
+    <Class>PatientDashboard.Data.DbSeeder</Class>
+    <MethodName>CalculateStatus(...)</MethodName>
+    <ShortName />
+    <Line>202</Line>
+    <FileIndex>0</FileIndex>
+    <Metrics>
+      <Metric>
+        <Name>Cyclomatic complexity</Name>
+        <Exceeded>true</Exceeded>
+        <Value>34</Value>
+      </Metric>
+    </Metrics>
+  </Hotspot>
+  <Hotspot>
+    <Assembly>PatientDashboard</Assembly>
+    <Class>PatientDashboard.Services.VitalSignService</Class>
+    <MethodName>CalculateStatus(...)</MethodName>
+    <ShortName />
+    <Line>140</Line>
+    <FileIndex>0</FileIndex>
+    <Metrics>
+      <Metric>
+        <Name>Cyclomatic complexity</Name>
+        <Exceeded>true</Exceeded>
+        <Value>34</Value>
+      </Metric>
+    </Metrics>
+  </Hotspot>
+  <Hotspot>
+    <Assembly>PatientDashboard</Assembly>
+    <Class>PatientDashboard.Migrations.AddedIdentityTables</Class>
+    <MethodName>BuildTargetModel(...)</MethodName>
+    <ShortName />
+    <Line>19</Line>
+    <FileIndex>1</FileIndex>
+    <Metrics>
+      <Metric>
+        <Name>Cyclomatic complexity</Name>
+        <Exceeded>true</Exceeded>
+        <Value>32</Value>
+      </Metric>
+    </Metrics>
+  </Hotspot>
+  <Hotspot>
+    <Assembly>PatientDashboard</Assembly>
+    <Class>PatientDashboard.Migrations.PatientDashboardDbContextModelSnapshot</Class>
+    <MethodName>BuildModel(...)</MethodName>
+    <ShortName />
+    <Line>16</Line>
+    <FileIndex>0</FileIndex>
+    <Metrics>
+      <Metric>
+        <Name>Cyclomatic complexity</Name>
+        <Exceeded>true</Exceeded>
+        <Value>32</Value>
+      </Metric>
+    </Metrics>
+  </Hotspot>
+</Hotspots>
