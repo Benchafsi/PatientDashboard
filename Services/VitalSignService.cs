@@ -136,7 +136,7 @@ public class VitalSignService : IVitalSignService
         return true;
     }
 
-    private static VitalStatus CalculateStatus(VitalSign v)
+    public static VitalStatus CalculateStatus(VitalSign v)
     {
         // Heart Rate: 60-100 N, 100-120 W, >120 C (below 60 => Warning)
         var hr = v.HeartRate switch
